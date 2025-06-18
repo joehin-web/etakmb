@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>九巴到站時間</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        select {
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        #etaResults {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .eta-item {
+            margin: 10px 0;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .loading {
+            font-style: italic;
+            color: #555;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>九巴到站時間</h1>
+    <label for="routeSelect">選擇巴士路線：</label>
+    <select id="routeSelect" onchange="fetchETA()">
+        <option value="" disabled selected>請選擇路線</option>
+        <option value="47X">47X</option>
+        <option value="47A">47A</option>
+        <option value="48X">48X</option>
+    </select>
+    <div id="etaResults">請選擇路線以查看結果。</div>
+
+    <script>
+        async function fetchETA() {
+            const route = document.getElementById('routeSelect').value;
+            const resultsDiv = document.getElementById('etaResults');
+            
+            if (!route) {
+                resultsDiv.innerHTML = '請選擇路線以查看結果。';
+                return;
+            }
+
+            const apiUrl = `https://data.etabus.gov.hk/v1/transport/kmb/eta/BA4CD6F5C93BB59E/${route}/1`;
+            resultsDiv.innerHTML = '<p class="loading">載入中...</p>';
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP錯誤！狀態：${response.status}`);
+                }
+                const data = await response.json();
+
+                if (data.data && data.data.length > 0) {
+                    resultsDiv.innerHTML = '';
+                    const now = new Date();
+                    data.data.forEach(eta => {
+                        const etaTime = new Date(eta.eta);
+                        const etaTimeString = etaTime.toLocaleTimeString('zh-HK');
+                        const timeDiff = (etaTime - now) / (1000 * 60); // Difference in minutes
+                        const remainingTime = timeDiff > 0 ? Math.round(timeDiff) : '已到達';
+                        const etaItem = document.createElement('div');
+                        etaItem.className = 'eta-item';
+                        etaItem.innerHTML = `
+                            <strong>路線：</strong> ${eta.route}<br>
+                            <strong>目的地：</strong> ${eta.dest_en}<br>
+                            <strong>預計到達時間：</strong> ${etaTimeString}<br>
+                            <strong>剩餘時間：</strong> ${remainingTime} ${timeDiff > 0 ? '分鐘' : ''}<br>
+                            <strong>備註：</strong> ${eta.rmk_en || '無'}
+                        `;
+                        resultsDiv.appendChild(etaItem);
+                    });
+                } else {
+                    resultsDiv.innerHTML = '<p>此路線暫無到站時間資料。</p>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<p class="error">獲取到站時間失敗：${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
